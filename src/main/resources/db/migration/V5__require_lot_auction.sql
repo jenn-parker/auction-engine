@@ -1,0 +1,1 @@
+ALTER TABLE lots ALTER COLUMN auction_id SET NOT NULL;

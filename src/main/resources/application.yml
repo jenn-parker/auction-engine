@@ -1,0 +1,49 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/auction_engine}
+    username: ${DB_USERNAME:auction}
+    password: ${DB_PASSWORD:auction}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc.time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: ${PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+security:
+  cognito:
+    enabled: ${COGNITO_ENABLED:false}
+    issuer-uri: ${COGNITO_ISSUER_URI:}
+
+aws:
+  localstack:
+    enabled: ${AWS_ENDPOINT:}
+
+payment:
+  gateway:
+    mock: ${PAYMENT_GATEWAY_MOCK:true}
+  outbox:
+    enabled: ${PAYMENT_OUTBOX_ENABLED:true}
+    batch-size: ${PAYMENT_OUTBOX_BATCH_SIZE:20}
+    lock-seconds: ${PAYMENT_OUTBOX_LOCK_SECONDS:60}
+    poll-delay-ms: ${PAYMENT_OUTBOX_POLL_DELAY_MS:1000}
+  worker:
+    enabled: ${PAYMENT_WORKER_ENABLED:true}
+    poll-delay-ms: ${PAYMENT_WORKER_POLL_DELAY_MS:1000}
