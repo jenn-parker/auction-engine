@@ -63,10 +63,10 @@ python3 -m http.server 8000 --directory docs
 ```
 
 Then open <http://localhost:8000>. The same `docs` directory can be selected as
-the GitHub Pages publishing folder to give reviewers a public `/docs` site.
+the GitHub Pages publishing folder to give reviewers a public [`/docs`](https://jenn-parker.github.io/auction-engine/) site.
 
-The [architecture overview](docs/architecture.md), [portfolio demo flow](docs/demo.md),
-and [architecture decision records](docs/adr/) explain the main design choices
+The [architecture overview](https://jenn-parker.github.io/auction-engine/architecture/), [portfolio demo flow](https://jenn-parker.github.io/auction-engine/demo),
+and [architecture decision records](https://jenn-parker.github.io/auction-engine/adr/) explain the main design choices
 without requiring a code walkthrough.
 
 `POST /api/v1/lots` is retained as a compatibility path but now requires `auctionId` in the request body. Lot IDs are unique.

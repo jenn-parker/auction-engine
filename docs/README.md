@@ -15,3 +15,6 @@ Then open <http://localhost:8000>.
 For a public portfolio preview, enable GitHub Pages for the repository and
 select the `main` branch with `/docs` as the publishing folder. The resulting
 site will open the Swagger UI automatically.
+
+The static [architecture overview](architecture/) and [decision records](adr/)
+are also available from the published site.

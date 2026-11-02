@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Auction Engine Architecture</title>
+  <style>
+    :root { color-scheme: light; font: 16px/1.5 system-ui, sans-serif; color: #24292f; }
+    body { max-width: 72rem; margin: 2.5rem auto; padding: 0 1.25rem; }
+    a { color: #0969da; }
+    .flow { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: .75rem; margin: 2rem 0; }
+    .node { min-width: 8rem; padding: 1rem; border: 2px solid #0969da; border-radius: .6rem; background: #ddf4ff; text-align: center; font-weight: 650; }
+    .store { border-color: #8250df; background: #fbefff; }
+    .worker { border-color: #1a7f37; background: #dafbe1; }
+    .arrow { color: #57606a; font-size: 1.5rem; }
+    .boundaries { display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: 1rem; }
+    .boundary { padding: 1rem 1.2rem; border: 1px solid #d0d7de; border-radius: .5rem; }
+  </style>
+</head>
+<body>
+  <p><a href="../">← API documentation</a></p>
+  <h1>Auction Engine Architecture</h1>
+  <p>Concurrency-safe bid ingestion, deterministic settlement, and idempotent payment orchestration.</p>
+  <div class="flow" aria-label="Client to API to database and asynchronous payment processing flow">
+    <div class="node">Web or mobile<br>client</div><div class="arrow">→</div>
+    <div class="node">Spring Boot<br>API</div><div class="arrow">→</div>
+    <div class="node store">PostgreSQL</div><div class="arrow">→</div>
+    <div class="node store">Transactional<br>outbox</div><div class="arrow">→</div>
+    <div class="node store">SQS<br>/ LocalStack</div><div class="arrow">→</div>
+    <div class="node worker">Payment<br>worker</div><div class="arrow">→</div>
+    <div class="node worker">Gateway<br>adapter</div>
+  </div>
+  <h2>Integrity boundaries</h2>
+  <div class="boundaries">
+    <div class="boundary"><strong>Bid ordering</strong><br>PostgreSQL compare-and-set persistence is authoritative when multiple application instances accept bids concurrently.</div>
+    <div class="boundary"><strong>Atomic history</strong><br>The accepted bid and its immutable history row commit in the same transaction.</div>
+    <div class="boundary"><strong>Reliable events</strong><br>Settlement writes the order and pending outbox event together, making publication recoverable after a restart.</div>
+    <div class="boundary"><strong>Payment safety</strong><br>SQS is at-least-once delivery; durable idempotency claims prevent duplicate gateway authorization.</div>
+    <div class="boundary"><strong>Credential boundary</strong><br>Payment methods retain provider-issued instrument references only. Raw card data stays outside this service.</div>
+    <div class="boundary"><strong>Observability</strong><br>Actuator and Prometheus expose bounded business metrics without putting customer or payment IDs in metric tags.</div>
+  </div>
+  <p><a href="../adr/">Read the architecture decision records →</a></p>
+</body>
+</html>

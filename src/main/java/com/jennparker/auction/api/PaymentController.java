@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Autowired;
 import javax.validation.Valid;
 import javax.validation.constraints.DecimalMin;
 import javax.validation.constraints.NotBlank;
@@ -24,6 +25,7 @@ public class PaymentController {
     private final PaymentQueryService payments;
     private final PaymentService paymentService;
 
+    @Autowired
     public PaymentController(PaymentQueryService payments, PaymentService paymentService) { this.payments = payments; this.paymentService = paymentService; }
 
     public PaymentController(PaymentQueryService payments) { this(payments, null); }
