@@ -1,0 +1,470 @@
+openapi: 3.0.3
+info:
+  title: Auction Engine API
+  version: 1.0.0
+  description: |
+    A concurrency-safe auction bidding, settlement, and payment orchestration API.
+    This checked-in contract is published as a static Swagger UI site for portfolio review.
+servers:
+  - url: http://localhost:8080
+    description: Local application
+tags:
+  - name: Auction Management
+    description: Create and manage auctions and their lots.
+  - name: Auction Operations
+    description: Live bidding and internal settlement operations.
+  - name: Customers
+    description: Customer profiles, balances, invoices, and payment methods.
+  - name: Payments
+    description: Authorized payment transactions, distinct from reusable payment methods.
+  - name: Auctioneers
+    description: Internal auctioneer provisioning.
+security:
+  - bearerAuth: []
+paths:
+  /api/v1/auctions:
+    post:
+      tags: [Auction Management]
+      summary: Create an auction
+      description: Creates a scheduled auction with an optional physical venue.
+      operationId: createAuction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateAuctionRequest' }
+      responses:
+        '201': { description: Auction created, content: { application/json: { schema: { $ref: '#/components/schemas/Auction' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/auctions/{auctionId}:
+    parameters: [{ $ref: '#/components/parameters/AuctionId' }]
+    get:
+      tags: [Auction Management]
+      summary: Get an auction
+      responses:
+        '200': { description: Auction and assigned lots, content: { application/json: { schema: { $ref: '#/components/schemas/Auction' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Auction Management]
+      summary: Replace an auction
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/AuctionRequest' } } }
+      responses: { '200': { description: Updated auction, content: { application/json: { schema: { $ref: '#/components/schemas/Auction' } } } }, '400': { $ref: '#/components/responses/BadRequest' }, '403': { $ref: '#/components/responses/Forbidden' } }
+    patch:
+      tags: [Auction Management]
+      summary: Partially update an auction
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/AuctionPatchRequest' } } }
+      responses: { '200': { description: Updated auction, content: { application/json: { schema: { $ref: '#/components/schemas/Auction' } } } }, '400': { $ref: '#/components/responses/BadRequest' } }
+  /api/v1/auctions/{auctionId}/lots:
+    parameters: [{ $ref: '#/components/parameters/AuctionId' }]
+    get:
+      tags: [Auction Management]
+      summary: List auction lots
+      responses: { '200': { description: Lots assigned to the auction, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Lot' } } } } } }
+    post:
+      tags: [Auction Management]
+      summary: Create a lot in an auction
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreateLotRequest' } } }
+      responses: { '201': { description: Lot created, content: { application/json: { schema: { $ref: '#/components/schemas/Lot' } } } }, '400': { $ref: '#/components/responses/BadRequest' }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /api/v1/auctions/{auctionId}/publish:
+    post:
+      tags: [Auction Management]
+      summary: Publish an auction
+      parameters: [{ $ref: '#/components/parameters/AuctionId' }]
+      responses: { '200': { description: Auction moved to UPCOMING, content: { application/json: { schema: { $ref: '#/components/schemas/Auction' } } } }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /api/v1/auctions/{auctionId}/start:
+    post:
+      tags: [Auction Management]
+      summary: Start an auction
+      parameters: [{ $ref: '#/components/parameters/AuctionId' }]
+      responses: { '200': { description: Auction moved to LIVE, content: { application/json: { schema: { $ref: '#/components/schemas/Auction' } } } } }
+  /api/v1/auctions/{auctionId}/close:
+    post:
+      tags: [Auction Management]
+      summary: Close an auction
+      parameters: [{ $ref: '#/components/parameters/AuctionId' }]
+      responses: { '200': { description: Auction moved to CLOSED, content: { application/json: { schema: { $ref: '#/components/schemas/Auction' } } } } }
+  /api/v1/lots:
+    post:
+      tags: [Auction Management]
+      summary: Create a lot using the compatibility path
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreateLotRequest' } } }
+      responses: { '201': { description: Lot created, content: { application/json: { schema: { $ref: '#/components/schemas/Lot' } } } } }
+  /api/v1/lots/{lotId}:
+    parameters: [{ $ref: '#/components/parameters/LotId' }]
+    get:
+      tags: [Auction Management]
+      summary: Get a lot
+      responses: { '200': { description: Lot details, content: { application/json: { schema: { $ref: '#/components/schemas/Lot' } } } }, '404': { $ref: '#/components/responses/NotFound' } }
+    put:
+      tags: [Auction Management]
+      summary: Replace a lot
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/LotUpdateRequest' } } }
+      responses: { '200': { description: Updated lot, content: { application/json: { schema: { $ref: '#/components/schemas/Lot' } } } } }
+    patch:
+      tags: [Auction Management]
+      summary: Partially update a lot
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/LotUpdateRequest' } } }
+      responses: { '200': { description: Updated lot, content: { application/json: { schema: { $ref: '#/components/schemas/Lot' } } } } }
+    delete:
+      tags: [Auction Management]
+      summary: Delete a lot
+      responses: { '204': { description: Lot deleted }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { description: Lot is referenced by bids or orders } }
+  /api/v1/lots/{lotId}/bids:
+    post:
+      tags: [Auction Operations]
+      summary: Submit a live bid
+      description: The bid must be strictly higher than the current bid and timestamped before the exact lot close time.
+      parameters: [{ $ref: '#/components/parameters/LotId' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/BidRequest' } } }
+      responses:
+        '202': { description: Bid accepted }
+        '400': { description: Bid is too low, late, or the lot is closed }
+        '403': { description: Customer is not eligible to bid }
+  /api/v1/internal/lots/{lotId}/settle:
+    post:
+      tags: [Auction Operations]
+      summary: Settle a lot
+      description: Creates an order only when the lot is closed and authorized payments plus credits cover the full amount owed.
+      parameters: [{ $ref: '#/components/parameters/LotId' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/SettlementRequest' } } }
+      responses: { '201': { description: Order created, content: { application/json: { schema: { $ref: '#/components/schemas/Order' } } } }, '409': { description: Lot is open, already settled, or underpaid } }
+  /api/v1/internal/auctions/{auctionId}/settle:
+    post:
+      tags: [Auction Operations]
+      summary: Settle an auction
+      description: Settles the customer's winning lots only after the auction is CLOSED and the full aggregate balance is covered.
+      parameters: [{ $ref: '#/components/parameters/AuctionId' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/SettlementRequest' } } }
+      responses: { '201': { description: Orders created, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Order' } } } } }, '409': { description: Auction is open, already settled, or underpaid } }
+  /api/v1/customers:
+    post:
+      tags: [Customers]
+      summary: Create a customer
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CustomerRequest' } } }
+      responses: { '201': { description: Customer created, content: { application/json: { schema: { $ref: '#/components/schemas/Customer' } } } } }
+  /api/v1/customers/{customerId}:
+    parameters: [{ $ref: '#/components/parameters/CustomerId' }]
+    put:
+      tags: [Customers]
+      summary: Replace a customer
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CustomerRequest' } } }
+      responses: { '200': { description: Updated customer, content: { application/json: { schema: { $ref: '#/components/schemas/Customer' } } } } }
+    patch:
+      tags: [Customers]
+      summary: Partially update a customer
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CustomerPatchRequest' } } }
+      responses: { '200': { description: Updated customer, content: { application/json: { schema: { $ref: '#/components/schemas/Customer' } } } } }
+  /api/v1/customers/{customerId}/balance:
+    get:
+      tags: [Customers]
+      summary: Get customer balance
+      parameters: [{ $ref: '#/components/parameters/CustomerId' }]
+      responses: { '200': { description: Outstanding balance, content: { application/json: { schema: { $ref: '#/components/schemas/Balance' } } } } }
+  /api/v1/customers/{customerId}/invoice:
+    get:
+      tags: [Customers]
+      summary: Get customer invoice
+      parameters: [{ $ref: '#/components/parameters/CustomerId' }]
+      responses: { '200': { description: Itemized won lots and payment status, content: { application/json: { schema: { type: object, additionalProperties: true } } } } }
+  /api/v1/customers/{customerId}/payment-methods:
+    parameters: [{ $ref: '#/components/parameters/CustomerId' }]
+    get:
+      tags: [Customers]
+      summary: List payment methods
+      responses: { '200': { description: Saved provider-safe payment references, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/PaymentMethod' } } } } } }
+    post:
+      tags: [Customers]
+      summary: Add a payment method
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/PaymentMethodRequest' } } }
+      responses: { '201': { description: Payment method created, content: { application/json: { schema: { $ref: '#/components/schemas/PaymentMethod' } } } } }
+  /api/v1/customers/{customerId}/payment-methods/{paymentMethodId}:
+    parameters:
+      - { $ref: '#/components/parameters/CustomerId' }
+      - { $ref: '#/components/parameters/PaymentMethodId' }
+    patch:
+      tags: [Customers]
+      summary: Partially update a payment method
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/PaymentMethodPatchRequest' } } }
+      responses: { '200': { description: Updated payment method, content: { application/json: { schema: { $ref: '#/components/schemas/PaymentMethod' } } } } }
+    delete:
+      tags: [Customers]
+      summary: Delete a payment method
+      responses: { '204': { description: Payment method deleted } }
+  /api/v1/payments:
+    post:
+      tags: [Payments]
+      summary: Create a payment
+      description: Authorizes a saved payment instrument and records a payment transaction for later settlement application.
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/PaymentRequest' } } }
+      responses: { '201': { description: Payment recorded, content: { application/json: { schema: { $ref: '#/components/schemas/Payment' } } } }, '402': { description: Payment authorization failed } }
+  /api/v1/payments/{paymentId}:
+    get:
+      tags: [Payments]
+      summary: Get a payment by ID
+      parameters: [{ $ref: '#/components/parameters/PaymentId' }]
+      responses: { '200': { description: Payment transaction, content: { application/json: { schema: { $ref: '#/components/schemas/Payment' } } } }, '404': { $ref: '#/components/responses/NotFound' } }
+  /api/v1/customers/{customerId}/payments:
+    get:
+      tags: [Payments]
+      summary: List customer payments
+      parameters: [{ $ref: '#/components/parameters/CustomerId' }]
+      responses: { '200': { description: Authorized payment transactions, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Payment' } } } } } }
+  /api/v1/customers/{customerId}/payments/{paymentId}:
+    get:
+      tags: [Payments]
+      summary: Get a customer's payment
+      parameters:
+        - { $ref: '#/components/parameters/CustomerId' }
+        - { $ref: '#/components/parameters/PaymentId' }
+      responses: { '200': { description: Payment transaction, content: { application/json: { schema: { $ref: '#/components/schemas/Payment' } } } } }
+  /api/v1/internal/auctioneers:
+    post:
+      tags: [Auctioneers]
+      summary: Provision an auctioneer
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/ProvisionAuctioneerRequest' } } }
+      responses: { '201': { description: Auctioneer created, content: { application/json: { schema: { $ref: '#/components/schemas/Auctioneer' } } } } }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Cognito access token. Auction management requires an active auctioneer subject.
+  parameters:
+    AuctionId: { name: auctionId, in: path, required: true, schema: { type: string } }
+    LotId: { name: lotId, in: path, required: true, schema: { type: string } }
+    CustomerId: { name: customerId, in: path, required: true, schema: { type: string } }
+    PaymentId: { name: paymentId, in: path, required: true, schema: { type: string, format: uuid } }
+    PaymentMethodId: { name: paymentMethodId, in: path, required: true, schema: { type: string } }
+    IdempotencyKey: { name: Idempotency-Key, in: header, required: true, description: Unique client key used to make payment retries safe., schema: { type: string, minLength: 1 } }
+  responses:
+    BadRequest: { description: Request validation failed }
+    Unauthorized: { description: Missing or invalid Cognito token }
+    Forbidden: { description: Authenticated principal is not eligible for this operation }
+    NotFound: { description: Resource not found }
+  schemas:
+    CreateAuctionRequest:
+      type: object
+      required: [auctionId, scheduledAt]
+      properties:
+        auctionId: { type: string, example: auction-2026-11-01 }
+        scheduledAt: { type: string, format: date-time }
+        physicalLocation: { $ref: '#/components/schemas/PhysicalLocation' }
+    AuctionRequest:
+      type: object
+      required: [scheduledAt]
+      properties:
+        scheduledAt: { type: string, format: date-time }
+        physicalLocation: { $ref: '#/components/schemas/PhysicalLocation' }
+    AuctionPatchRequest:
+      type: object
+      properties:
+        scheduledAt: { type: string, format: date-time }
+        physicalLocation: { $ref: '#/components/schemas/PhysicalLocation' }
+    Auction:
+      allOf:
+        - $ref: '#/components/schemas/AuctionRequest'
+        - type: object
+          properties:
+            id: { type: string }
+            state: { type: string, enum: [NOT_YET_PUBLIC, UPCOMING, LIVE, CLOSED] }
+            lots: { type: array, items: { $ref: '#/components/schemas/Lot' } }
+    PhysicalLocation:
+      type: object
+      properties:
+        venueName: { type: string }
+        line1: { type: string }
+        line2: { type: string }
+        city: { type: string }
+        stateOrRegion: { type: string }
+        postalCode: { type: string }
+        countryCode: { type: string, minLength: 2, maxLength: 2 }
+    CreateLotRequest:
+      type: object
+      required: [lotId, closesAt]
+      properties:
+        lotId: { type: string }
+        auctionId: { type: string }
+        opensAt: { type: string, format: date-time }
+        closesAt: { type: string, format: date-time }
+        category: { type: string }
+        condition: { type: string, enum: [UNKNOWN, NEW, USED, DAMAGED, RESTORED] }
+        conditionNotes: { type: string }
+        provenance: { type: object, additionalProperties: { type: string } }
+        measurements: { type: object, additionalProperties: true }
+        fulfillmentOptions: { type: array, items: { type: string } }
+        imageUrls: { type: array, items: { type: string, format: uri } }
+        reservePrice: { type: number, format: double, minimum: 0 }
+        currency: { type: string, minLength: 3, maxLength: 3, example: USD }
+        buyerPremiumRate: { type: number, format: double, minimum: 0 }
+        taxRate: { type: number, format: double, minimum: 0 }
+    LotUpdateRequest:
+      type: object
+      required: [closesAt]
+      properties: { closesAt: { type: string, format: date-time } }
+    Lot:
+      allOf:
+        - $ref: '#/components/schemas/CreateLotRequest'
+        - type: object
+          properties:
+            id: { type: string }
+            currentBid: { type: number, format: double }
+            winningCustomerId: { type: string }
+            createdAt: { type: string, format: date-time }
+            lastUpdated: { type: string, format: date-time }
+    BidRequest:
+      type: object
+      required: [customerId, bidAmount, timestamp]
+      properties:
+        customerId: { type: string }
+        bidAmount: { type: number, format: double, minimum: 0.01 }
+        timestamp: { type: string, format: date-time, description: Client event time; must be before the exact lot close timestamp. }
+    SettlementRequest:
+      type: object
+      required: [customerId, payments]
+      properties:
+        customerId: { type: string }
+        payments: { type: array, items: { $ref: '#/components/schemas/SettlementPayment' } }
+        creditAmount: { type: number, format: double, minimum: 0, default: 0 }
+    SettlementPayment:
+      type: object
+      required: [amount]
+      properties:
+        paymentId: { type: string, format: uuid, description: Existing authorized payment transaction. }
+        paymentMethodId: { type: string, description: Use when creating an authorized settlement payment through the orchestration path. }
+        amount: { type: number, format: double, minimum: 0.01 }
+    CustomerRequest:
+      type: object
+      required: [customerId, name, email]
+      properties:
+        customerId: { type: string }
+        name: { type: string }
+        email: { type: string, format: email }
+        phone: { type: string }
+        address: { $ref: '#/components/schemas/Address' }
+        accountStatus: { type: string, enum: [ACTIVE, SUSPENDED] }
+        biddingEnabled: { type: boolean, default: true }
+        paymentMethod: { $ref: '#/components/schemas/PaymentMethodRequest' }
+    CustomerPatchRequest:
+      type: object
+      properties:
+        name: { type: string }
+        email: { type: string, format: email }
+        phone: { type: string }
+        accountStatus: { type: string, enum: [ACTIVE, SUSPENDED] }
+        biddingEnabled: { type: boolean }
+    Customer:
+      allOf:
+        - $ref: '#/components/schemas/CustomerRequest'
+        - type: object
+          properties: { id: { type: string }, paymentMethods: { type: array, items: { $ref: '#/components/schemas/PaymentMethod' } } }
+    Address:
+      type: object
+      required: [line1, city, stateOrRegion, postalCode, countryCode]
+      properties:
+        line1: { type: string }
+        line2: { type: string }
+        city: { type: string }
+        stateOrRegion: { type: string }
+        postalCode: { type: string }
+        countryCode: { type: string, minLength: 2, maxLength: 2 }
+    PaymentMethodRequest:
+      type: object
+      required: [paymentMethodId, type]
+      properties:
+        paymentMethodId: { type: string, description: Provider token/reference; never raw card data. }
+        provider: { type: string, default: external }
+        type: { type: string, enum: [CARD, BANK_ACCOUNT, WALLET] }
+        authorized: { type: boolean, default: true }
+        isDefault: { type: boolean, default: false }
+        expirationMonth: { type: integer, minimum: 1, maximum: 12 }
+        expirationYear: { type: integer, minimum: 2000 }
+    PaymentMethodPatchRequest:
+      type: object
+      properties:
+        provider: { type: string }
+        type: { type: string, enum: [CARD, BANK_ACCOUNT, WALLET] }
+        authorized: { type: boolean }
+        isDefault: { type: boolean }
+        expirationMonth: { type: integer, minimum: 1, maximum: 12 }
+        expirationYear: { type: integer, minimum: 2000 }
+    PaymentMethod:
+      allOf:
+        - $ref: '#/components/schemas/PaymentMethodRequest'
+        - type: object
+          properties: { id: { type: string } }
+    PaymentRequest:
+      type: object
+      required: [customerId, paymentMethodId, amount]
+      properties:
+        customerId: { type: string }
+        paymentMethodId: { type: string }
+        amount: { type: number, format: double, minimum: 0.01 }
+    Payment:
+      allOf:
+        - $ref: '#/components/schemas/PaymentRequest'
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            status: { type: string, enum: [PROCESSING, AUTHORIZED, COMPLETED, FAILED, REFUNDED] }
+            createdAt: { type: string, format: date-time }
+    Balance:
+      type: object
+      additionalProperties: true
+      description: Customer's current unpaid balance and associated orders.
+    Order:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        lotId: { type: string }
+        customerId: { type: string }
+        total: { type: number, format: double }
+        state: { type: string, enum: [PENDING, PROCESSING, SETTLED, FAILED] }
+    ProvisionAuctioneerRequest:
+      type: object
+      required: [auctioneerId, cognitoSubject, name, email]
+      properties:
+        auctioneerId: { type: string }
+        cognitoSubject: { type: string }
+        name: { type: string }
+        email: { type: string, format: email }
+    Auctioneer:
+      allOf:
+        - $ref: '#/components/schemas/ProvisionAuctioneerRequest'
+        - type: object
+          properties: { id: { type: string }, active: { type: boolean } }

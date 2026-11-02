@@ -50,6 +50,25 @@ Customers are immutable snapshots with name, email, phone, postal `Address`, acc
 
 ## API
 
+### Static Swagger documentation
+
+The repository includes a static, hiring-manager-friendly API reference at
+[`docs/index.html`](docs/index.html), backed by the checked-in
+[`docs/openapi.yaml`](docs/openapi.yaml). It does not require the application,
+PostgreSQL, LocalStack, or Cognito to be running. For local preview, serve the
+directory so the browser can load the YAML contract:
+
+```bash
+python3 -m http.server 8000 --directory docs
+```
+
+Then open <http://localhost:8000>. The same `docs` directory can be selected as
+the GitHub Pages publishing folder to give reviewers a public `/docs` site.
+
+The [architecture overview](docs/architecture.md), [portfolio demo flow](docs/demo.md),
+and [architecture decision records](docs/adr/) explain the main design choices
+without requiring a code walkthrough.
+
 `POST /api/v1/lots` is retained as a compatibility path but now requires `auctionId` in the request body. Lot IDs are unique.
 
 `POST /api/v1/auctions` creates a scheduled auction with optional physical-location data. `POST /api/v1/auctions/{auctionId}/lots` creates a lot owned by that auction, `GET /api/v1/auctions/{auctionId}` returns the auction with its collection of lots, and `GET /api/v1/auctions/{auctionId}/lots` returns the lot collection directly. `GET /api/v1/lots/{lotId}` returns an individual lot. The auction-scoped creation endpoint is the preferred path because a lot must belong to exactly one auction.
@@ -57,6 +76,23 @@ Customers are immutable snapshots with name, email, phone, postal `Address`, acc
 Auction lifecycle transitions use `POST /api/v1/auctions/{auctionId}/publish`, `/start`, and `/close`. The allowed sequence is `NOT_YET_PUBLIC -> UPCOMING -> LIVE -> CLOSED`; bids are accepted only while the parent auction is `LIVE`.
 
 Settlement supports both `POST /api/v1/internal/lots/{lotId}/settle` and `POST /api/v1/internal/auctions/{auctionId}/settle`. Auction-level settlement requires `CLOSED` state and creates orders for lots with winning bids.
+
+## Production considerations
+
+This is a portfolio reference implementation, not a PCI-certified payment
+system. A production deployment would additionally require:
+
+- managed PostgreSQL high availability, connection-pool limits, indexes, and
+  load tests against realistic auction-spike traffic;
+- an SQS dead-letter queue, alerting on outbox age and worker lag, and an
+  operational replay/runbook for failed messages;
+- a real payment-provider adapter with provider reconciliation, webhook
+  handling, refund flows, and carefully scoped secrets/IAM permissions;
+- synchronized server/database clocks and an explicit policy for late events;
+- dashboards and alerts for bid rejection rates, settlement failures,
+  authorization latency, queue depth, and database contention; and
+- formal threat modeling, PII retention controls, audit logging, and a review
+  of Cognito scopes and auctioneer provisioning permissions.
 
 Auctions support `PUT` and `PATCH` at `/api/v1/auctions/{auctionId}`. Lots support `PUT` and `PATCH` at `/api/v1/lots/{lotId}` for closing-time changes, plus `DELETE /api/v1/lots/{lotId}`. Closed lots cannot be modified, and lots referenced by bids or orders cannot be deleted.
 
@@ -100,6 +136,16 @@ The test suite currently covers:
 - HTTP validation and response status codes through standalone MockMvc tests.
 
 Run it with `mvn test`. The default suite is intentionally infrastructure-free; Docker/PostgreSQL and LocalStack are only required for running the application stack.
+
+### Integration tests
+
+The `integration` Maven profile runs `MigrationIntegrationIT` with Testcontainers and a fresh PostgreSQL 16 container. It verifies that Flyway applies every migration and that Hibernate starts successfully with `ddl-auto=validate`. Docker is required:
+
+```bash
+mvn -Pintegration verify
+```
+
+The normal `mvn test` path does not require Docker, PostgreSQL, LocalStack, or a payment gateway.
 
 For a repeatable Java 8 throughput harness of concurrent bid acceptance, run `mvn -Pperformance test exec:java`. The benchmark is separate from the normal test naming convention and reports throughput rather than enforcing a machine-specific timing threshold.
 
